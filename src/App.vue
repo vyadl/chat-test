@@ -20,18 +20,30 @@
               v-for="(message, index) in toChat"
               :key="index" 
               :class="message.owner"
-            >{{message.text}}</li>
+            >
+              <vue-typed-js
+                :showCursor="false"
+                :strings="[message.text]"
+                @onComplete="checkNext"
+                v-if="message.owner === 'him'"
+              >
+                <span class="typing"></span>
+              </vue-typed-js>
+              <template v-else>
+                {{ message.text }}
+              </template>
+            </li>
+
           </ul>
         </v-row>
         <v-row class="message-wrap">
           <v-col cols="12" md="12">
             <v-textarea
               filled
-              name="input-7-1"
               label="Type your message"
               ref="textarea"
               v-model="userMessage"
-            ></v-textarea>
+            />
           </v-col>
           <v-col cols="12" md="12">
             <div class="my-2">
@@ -67,7 +79,7 @@ export default {
       age: 0,
       location: '',
       feeling: '',
-      hobby: ''
+      hobby: '',
     },
     lastTopic: '',
     next: 0,
@@ -80,9 +92,17 @@ export default {
     },
     chatFinished() {
       return !Object.values(this.answers).some(answer => answer === '');
-    }
+    },
+    isBotFinished() {
+      return Boolean(this.messages[this.next - 1] && this.messages[this.next - 1].ask);
+    },
   },
   methods: {
+    checkNext() {
+      if (!this.isBotFinished) {
+        setTimeout(this.botTalk, 300);
+      }
+    },
     send() {
       if (this.userMessage !== '') {
         this.messages.splice(this.next, 0, {
@@ -95,30 +115,29 @@ export default {
         }
 
         this.userMessage = '';
-        this.botTalk();
+        this.showNextMessage();
+        setTimeout(this.botTalk, 500);
       }
     },
     botTalk() {
-      let active = true;
+      const topic = this.messages[this.next] && this.messages[this.next].ask;
 
-      while (active) {
-        const topic = this.messages[this.next] && this.messages[this.next].ask;
-        
-        this.next += 1;
+      this.showNextMessage();
 
-        if (typeof topic !== 'undefined' || !this.messages[this.next]) {
-          this.lastTopic = topic;
-          active = false;
-        }
-
-        this.$nextTick(() => {
-          this.$refs.chatWindow.scrollTop = this.$refs.chatWindow.scrollHeight;
-          if (!this.chatFinished) {
-            this.$refs.textarea.focus();
-          }
-        });
+      if (typeof topic !== 'undefined' || !this.messages[this.next]) {
+        this.lastTopic = topic;
       }
-    }
+
+      if (!this.chatFinished && this.isBotFinished) {
+        this.$refs.textarea.focus();
+      }
+    },
+    showNextMessage() {
+      this.next += 1;
+      this.$nextTick(() => {
+        this.$refs.chatWindow.scrollTop = this.$refs.chatWindow.scrollHeight;
+      });
+    },
   }
 };
 </script>
@@ -154,6 +173,7 @@ export default {
     margin-bottom: 2px;
     padding: 20px;
     font-family: Helvetica, Arial, sans-serif;
+    transition: border-radius .2s;
   }
 
   .message-send {
