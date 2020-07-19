@@ -4,33 +4,44 @@
       app
       color="primary"
       dark
-    >
-      <div class="d-flex align-center">
-
-      </div>
-
-      <v-spacer></v-spacer>
-    </v-app-bar>
-
+    />
     <v-content>
-      <v-container fluid>
-        <v-row>
-          <ul>
-            <li v-for="(message, index) in messages.slice(0, next)" v-bind:key="index" :class="message.owner">{{message.text}}</li>
+      <v-container
+        class="chat-wrap"
+        fluid
+      >
+        <v-row class="chat-window">
+          <ul
+            ref="chatWindow"
+            class="chat-list"
+          >
+            <li
+              class="chat-item"
+              v-for="(message, index) in toChat"
+              :key="index" 
+              :class="message.owner"
+            >{{message.text}}</li>
           </ul>
         </v-row>
-        <v-row :style="{position: 'absolute', bottom: 0, left: 0, right: 0, padding: '10px', zIndex: 100, background: '#ffffff'}">
+        <v-row class="message-wrap">
           <v-col cols="12" md="12">
             <v-textarea
-                    filled
-                    name="input-7-1"
-                    label="Type your message"
-                    v-model="input"
+              filled
+              name="input-7-1"
+              label="Type your message"
+              ref="textarea"
+              v-model="userMessage"
             ></v-textarea>
           </v-col>
           <v-col cols="12" md="12">
             <div class="my-2">
-              <v-btn @click="send" x-large :style="{position: 'absolute', bottom: 0, right: 0, background: '#56c8d8'}" color="primary" dark>Send Message</v-btn>
+              <v-btn
+                @click="send"
+                x-large
+                class="send-btn"
+                color="primary"
+                :disabled="chatFinished"
+              >{{toChat.length ? 'Send Message' : 'Let\'s chat!'}}</v-btn>
             </div>
           </v-col>
         </v-row>
@@ -40,92 +51,89 @@
 </template>
 
 <script>
+import axios from 'axios';
 
 export default {
-  name: 'App',
-
-  components: {
-
+  name: 'Chat',
+  beforeMount() {
+    axios.get('http://localhost:8080/data/botMessages.json').then(({ data }) => {
+      this.messages = data;
+      this.botTalk();
+    })
   },
-
   data: () => ({
-    name: '',
-    age: 0,
-    location: '',
-    feeling: '',
-    hobby: '',
+    answers: {
+      name: '',
+      age: 0,
+      location: '',
+      feeling: '',
+      hobby: ''
+    },
+    lastTopic: '',
     next: 0,
-    input: '',
-    toChat: [],
-    messages: [
-      {
-        text: "Hi, I'm Peter!",
-        owner: 'him'
-      },
-      {
-        text: "What's your name?",
-        ask: "name",
-        owner: 'him'
-      },
-      {
-        text: "Nice to meet you!",
-        owner: 'him'
-      },
-      {
-        text: "How was your day?",
-        ask: "feeling",
-        owner: 'him'
-      },
-      {
-        text: "Where're you from?",
-        ask: "location",
-        owner: 'him'
-      },
-      {
-        text: "Nice!",
-        owner: 'him'
-      },
-      {
-        text: "How old are you?",
-        ask: "age",
-        owner: 'him'
-      },
-      {
-        text: "What's your favorite hobby?",
-        ask: "hobby",
-        owner: 'him'
-      },
-      {
-        text: "Wow, cool",
-      }
-    ]
+    userMessage: '',
+    messages: [],
   }),
+  computed: {
+    toChat() {
+      return this.messages.slice(0, this.next);
+    },
+    chatFinished() {
+      return !Object.values(this.answers).some(answer => answer === '');
+    }
+  },
   methods: {
     send() {
-      let active = true
-      while(active) {
+      if (this.userMessage !== '') {
+        this.messages.splice(this.next, 0, {
+          text: this.userMessage,
+          owner: 'me',
+        });
 
-        if (typeof this.messages[this.next].ask === 'undefined') {
-          this.next += 1;
-        } else {
-          this.next += 1;
-          if (this.messages[this.next].ask === 'name') {
-            this.name = this.input
-            this.messages.splice(this.next, 0,{
-              text: this.input,
-              owner: 'me'
-            })
-          }
+        if (this.lastTopic !== '') {
+          this.answers[this.lastTopic] = this.userMessage;
+        }
+
+        this.userMessage = '';
+        this.botTalk();
+      }
+    },
+    botTalk() {
+      let active = true;
+
+      while (active) {
+        const topic = this.messages[this.next] && this.messages[this.next].ask;
+        
+        this.next += 1;
+
+        if (typeof topic !== 'undefined' || !this.messages[this.next]) {
+          this.lastTopic = topic;
           active = false;
         }
+
+        this.$nextTick(() => {
+          this.$refs.chatWindow.scrollTop = this.$refs.chatWindow.scrollHeight;
+          if (!this.chatFinished) {
+            this.$refs.textarea.focus();
+          }
+        });
       }
     }
   }
 };
 </script>
 
-<style>
-  ul{
+<style lang="scss">
+  .chat-wrap {
+    height: 90vh;
+  }
+
+  .chat-window {
+    height: 50%;
+    position: relative;
+  }
+
+  .chat-list {
     list-style: none;
     margin: 0;
     padding: 0;
@@ -133,41 +141,59 @@ export default {
     left: 0;
     right: 0;
     overflow-y: scroll;
-    height:600px;
+    scroll-behavior: smooth;
+    height: 100%;
     z-index: 0;
-    padding-bottom: 100px;
+    padding-bottom: 20px;
   }
 
-  ul li{
-    display:inline-block;
+  .chat-item {
+    display: inline-block;
     clear: both;
-    padding: 20px;
     border-radius: 30px;
     margin-bottom: 2px;
+    padding: 20px;
     font-family: Helvetica, Arial, sans-serif;
   }
 
-  .him{
-    background: #eee;
-    float: left;
+  .message-send {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    padding: 10px;
+    z-index: 100;
+    height: 50%;
+    background: #fff;
   }
 
-  .me{
+  .send-btn {
+    position: absolute;
+    bottom: 0;
+    right: 0;
+    background: #56c8d8;
+    margin: 0 auto;
+    display: block;
+  }
+
+  .him {
+    background: #eee;
+    float: left;
+    & + .me {
+      border-bottom-right-radius: 5px;
+    }
+  }
+
+  .me {
     float: right;
     background: #0084ff;
     color: #fff;
-  }
-
-  .him + .me{
-    border-bottom-right-radius: 5px;
-  }
-
-  .me + .me{
-    border-top-right-radius: 5px;
-    border-bottom-right-radius: 5px;
-  }
-
-  .me:last-of-type {
-    border-bottom-right-radius: 30px;
+    & + .me {
+      border-top-right-radius: 5px;
+      border-bottom-right-radius: 5px;
+    }
+    &:last-of-type {
+      border-bottom-right-radius: 30px;
+    }
   }
 </style>
